@@ -15,6 +15,7 @@
 #include "../include/cyber28.h"
 #include "../include/rm67162.h"
 #include "../include/stations.h"
+#include "../include/welcome.h"
 #include "../include/xie14.h"
 #include "../include/xie20.h"
 #include "../include/xie24.h"
@@ -28,7 +29,8 @@ using namespace std;
 #define METRO_STATION_NUM 12 // 每页站点总数
 #define RIGHT_BUTTON 21      // 右键
 #define LEFT_BUTTON 0        // 左键
-
+#define CYBER_YELLOW 0xFF69
+#define CYBER_BLUE 0x6F7F
 /* UI清单 */
 enum UI {
     WELCOME,             // 欢迎
@@ -66,7 +68,7 @@ TFT_eSprite user_guide_spr = TFT_eSprite(&tft);
 
 uint8_t cur_ui = WELCOME;                           // 当前UI
 uint8_t pre_ui = WELCOME;                           // 上一个UI
-int8_t welcome_cur_select = -1;                     // 欢迎页选择的序号
+int8_t welcome_cur_select = 0;                      // 欢迎页选择的序号
 std::map<string, vector<int>> transitions;          // 换乘站点，站点名:线路列表，如，徐家汇:1,9,11
 int16_t cur_line = 0;                               // Metro页当前线路
 int16_t cur_station_idx = 0;                        // Metro页当前站点序号
@@ -233,46 +235,12 @@ void init_lists() {
     }
 }
 
-// 画按钮
-void draw_button(TFT_eSprite &spr, int idx, bool select) {
-    const char s[][20] = {
-        "用户指南",
-        "搜索站点",
-        "显示线路",
-    };
-
-    if (select) {
-        spr.setTextColor(TFT_BLACK, TFT_WHITE);
-        spr.fillSmoothRoundRect(30, 220 + idx * 70, 180, 60, 15, TFT_DARKGREY);
-        spr.fillSmoothRoundRect(36, 226 + idx * 70, 168, 48, 9, TFT_WHITE);
-    } else {
-        spr.setTextColor(TFT_WHITE, TFT_DARKGREY);
-        spr.fillSmoothRoundRect(30, 220 + idx * 70, 180, 60, 15, TFT_DARKGREY);
-    }
-
-    spr.drawCentreString(s[idx], 120, 240 + idx * 70, 20);
-}
-
 // 进入欢迎页
 void draw_welcome_page() {
     welcome_spr.createSprite(240, 536);
     welcome_spr.setSwapBytes(true);
-    welcome_spr.fillSprite(TFT_BLACK);
-    welcome_spr.fillSmoothRoundRect(10, 130, 220, 310, 30, TFT_WHITE);
     welcome_spr.loadFont(cyber28);
-    welcome_spr.setTextColor(TFT_BLACK, TFT_WHITE);
-    welcome_spr.pushImage(30, 140, 21, 30, ditieicon);
-    welcome_spr.drawString("cyberpunk metro", 60, 145);
-    welcome_spr.loadFont(xie14);
-    welcome_spr.drawCentreString("Version 1.0.0", 120, 175, 20);
-    welcome_spr.loadFont(xie14);
-    welcome_spr.drawCentreString("Author: Jianliang Shen", 120, 190, 14);
-    welcome_spr.loadFont(xie24);
-
-    /* draw buttons */
-    draw_button(welcome_spr, 0, welcome_cur_select == 0);
-    draw_button(welcome_spr, 1, welcome_cur_select == 1);
-    draw_button(welcome_spr, 2, welcome_cur_select == 2);
+    welcome_spr.pushImage(0, 0, 240, 536, welcome_page[welcome_cur_select]);
 
     lcd_PushColors(0, 0, 240, 536, (uint16_t *)welcome_spr.getPointer());
 }
@@ -284,7 +252,7 @@ void draw_metro_line_page() {
 
     metro_spr.createSprite(240, 536);
     metro_spr.setSwapBytes(true);
-    metro_spr.fillSprite(TFT_WHITE);
+    metro_spr.fillSprite(CYBER_YELLOW);
     metro_spr.pushImage(35, 10, 21, 30, ditieicon);
 
     /* 画线路 */
@@ -295,18 +263,18 @@ void draw_metro_line_page() {
                          (cur_station_idx < METRO_STATION_NUM ? 0 : (cur_station_idx - (METRO_STATION_NUM - 1)));
     for (int j = 0; j < min(METRO_STATION_NUM, line_station_nums[cur_line]); j++) {
         metro_spr.loadFont(xie20);
-        metro_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+        metro_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
         metro_spr.drawString(line_names[cur_line], 60, 17);
         metro_spr.drawString(stations[j + start_idx], 60, 50 + j * 40);
         metro_spr.fillCircle(44, 60 + j * 40, 10, line_colors[cur_line]);
-        metro_spr.fillCircle(44, 60 + j * 40, 4, TFT_WHITE);
+        metro_spr.fillCircle(44, 60 + j * 40, 4, CYBER_YELLOW);
 
         // 画换乘线路
         vector<int> trans = get_transition_lines(j + start_idx);
         for (int i = 0; i < trans.size(); i++) {
             metro_spr.fillSmoothRoundRect(60 + 56 * i, 70 + j * 40, 50, 16, 5, line_colors[trans[i]]);
             metro_spr.loadFont(xie14);
-            metro_spr.setTextColor(dark_lines.find(trans[i]) != dark_lines.end() ? TFT_WHITE
+            metro_spr.setTextColor(dark_lines.find(trans[i]) != dark_lines.end() ? CYBER_YELLOW
                                                                                  : TFT_BLACK, // 深色线改变字体显示颜色
                                    line_colors[trans[i]]);
             metro_spr.drawCentreString(line_names[trans[i]], 85 + 56 * i, 72 + j * 40, 12);
@@ -315,12 +283,12 @@ void draw_metro_line_page() {
 
     // 画左侧箭头
     uint16_t arrow_y = cur_station_idx >= METRO_STATION_NUM ? (METRO_STATION_NUM - 1) : cur_station_idx;
-    metro_spr.fillTriangle(3, 52 + arrow_y * 40, 3, 68 + arrow_y * 40, 28, 60 + arrow_y * 40, line_colors[cur_line]);
+    metro_spr.fillTriangle(3, 52 + arrow_y * 40, 3, 68 + arrow_y * 40, 28, 60 + arrow_y * 40, TFT_BLACK);
 
     // 画右上角起点站
     if (start_station != -1) {
         metro_spr.loadFont(xie14);
-        metro_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+        metro_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
         metro_spr.drawCentreString("起点", 175, 13, 14);
         metro_spr.drawCentreString(stations[start_station], 175, 27, 14);
     }
@@ -357,12 +325,12 @@ void draw_search_start() {
 
     search_start_spr.createSprite(240, 536);
     search_start_spr.setSwapBytes(true);
-    search_start_spr.fillSprite(TFT_WHITE);
+    search_start_spr.fillSprite(CYBER_YELLOW);
     search_start_spr.loadFont(xie28);
-    search_start_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+    search_start_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
     search_start_spr.drawCentreString("请输入起点：", 120, 20, 28);
     search_start_spr.fillRect(3, 78, 234, 39, TFT_BLACK);
-    search_start_spr.fillRect(5, 80, 230, 35, TFT_WHITE);
+    search_start_spr.fillRect(5, 80, 230, 35, CYBER_YELLOW);
     search_start_spr.fillTriangle(112, 150, 128, 150, 120, 120, TFT_BLACK);
 
     // 显示当前已输入字符
@@ -381,13 +349,13 @@ void draw_search_start() {
             idx %= 26;
         }
 
-        search_start_spr.drawCentreString(alpha[idx], 30 + 30 * j, 90, 28);
+        search_start_spr.drawCentreString(alpha[idx], 30 + 30 * j, 85, 28);
     }
 
     // 设置结果框和字体颜色，表示未起效
-    search_start_spr.fillRect(3, 153, 234, 364, TFT_LIGHTGREY);
-    search_start_spr.fillRect(5, 155, 230, 360, TFT_WHITE);
-    search_start_spr.setTextColor(TFT_LIGHTGREY, TFT_WHITE);
+    search_start_spr.fillRect(3, 153, 234, 364, TFT_DARKGREY);
+    search_start_spr.fillRect(5, 155, 230, 360, CYBER_YELLOW);
+    search_start_spr.setTextColor(TFT_DARKGREY, CYBER_YELLOW);
     search_start_spr.loadFont(xie20);
     start_ret.clear();
 
@@ -412,8 +380,8 @@ void draw_search_start_select() {
     button_left.setLongPressIntervalMs(10);
     button_right.setLongPressIntervalMs(10);
     search_start_spr.fillRect(3, 153, 234, 364, TFT_BLACK);
-    search_start_spr.fillRect(5, 155, 230, 360, TFT_WHITE);
-    search_start_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+    search_start_spr.fillRect(5, 155, 230, 360, CYBER_YELLOW);
+    search_start_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
 
     int n = start_ret.size(), start_idx = 0;
 
@@ -426,9 +394,8 @@ void draw_search_start_select() {
     for (int i = start_idx; i < start_idx + min(12, start_ret.size()); i++) {
         // 选中色块为黑底白字
         search_start_spr.fillRect(5, 155 + 30 * (i - start_idx), 230, 30,
-                                  i == cur_start_select ? TFT_BLACK : TFT_WHITE);
-        search_start_spr.setTextColor(i != cur_start_select ? TFT_BLACK : TFT_WHITE,
-                                      i == cur_start_select ? TFT_BLACK : TFT_WHITE);
+                                  i == cur_start_select ? CYBER_BLUE : CYBER_YELLOW);
+        search_start_spr.setTextColor(TFT_BLACK, i == cur_start_select ? CYBER_BLUE : CYBER_YELLOW);
         search_start_spr.drawString(station_pinyin[start_ret[i]][1], 16, 160 + 30 * (i - start_idx));
     }
 
@@ -442,12 +409,12 @@ void draw_search_end() {
 
     search_end_spr.createSprite(240, 536);
     search_end_spr.setSwapBytes(true);
-    search_end_spr.fillSprite(TFT_WHITE);
+    search_end_spr.fillSprite(CYBER_YELLOW);
     search_end_spr.loadFont(xie28);
-    search_end_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+    search_end_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
     search_end_spr.drawCentreString("请输入终点：", 120, 20, 28);
     search_end_spr.fillRect(3, 78, 234, 39, TFT_BLACK);
-    search_end_spr.fillRect(5, 80, 230, 35, TFT_WHITE);
+    search_end_spr.fillRect(5, 80, 230, 35, CYBER_YELLOW);
     search_end_spr.fillTriangle(112, 150, 128, 150, 120, 120, TFT_BLACK);
 
     // 显示当前已输入字符
@@ -466,13 +433,13 @@ void draw_search_end() {
             idx %= 26;
         }
 
-        search_end_spr.drawCentreString(alpha[idx], 30 + 30 * j, 90, 28);
+        search_end_spr.drawCentreString(alpha[idx], 30 + 30 * j, 85, 28);
     }
 
     // 设置结果框和字体颜色，表示未起效
-    search_end_spr.fillRect(3, 153, 234, 364, TFT_LIGHTGREY);
-    search_end_spr.fillRect(5, 155, 230, 360, TFT_WHITE);
-    search_end_spr.setTextColor(TFT_LIGHTGREY, TFT_WHITE);
+    search_end_spr.fillRect(3, 153, 234, 364, TFT_DARKGREY);
+    search_end_spr.fillRect(5, 155, 230, 360, CYBER_YELLOW);
+    search_end_spr.setTextColor(TFT_DARKGREY, CYBER_YELLOW);
     search_end_spr.loadFont(xie20);
     end_ret.clear();
 
@@ -496,8 +463,8 @@ void draw_search_end_select() {
     button_left.setLongPressIntervalMs(10);
     button_right.setLongPressIntervalMs(10);
     search_end_spr.fillRect(3, 153, 234, 364, TFT_BLACK);
-    search_end_spr.fillRect(5, 155, 230, 360, TFT_WHITE);
-    search_end_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+    search_end_spr.fillRect(5, 155, 230, 360, CYBER_YELLOW);
+    search_end_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
 
     int n = end_ret.size(), start_idx = 0;
 
@@ -509,9 +476,9 @@ void draw_search_end_select() {
 
     for (int i = start_idx; i < start_idx + min(12, end_ret.size()); i++) {
         // 选中色块为黑底白字
-        search_end_spr.fillRect(5, 155 + 30 * (i - start_idx), 230, 30, i == cur_end_select ? TFT_BLACK : TFT_WHITE);
-        search_end_spr.setTextColor(i != cur_end_select ? TFT_BLACK : TFT_WHITE,
-                                    i == cur_end_select ? TFT_BLACK : TFT_WHITE);
+        search_end_spr.fillRect(5, 155 + 30 * (i - start_idx), 230, 30,
+                                i == cur_end_select ? CYBER_BLUE : CYBER_YELLOW);
+        search_end_spr.setTextColor(TFT_BLACK, i == cur_end_select ? CYBER_BLUE : CYBER_YELLOW);
         search_end_spr.drawString(station_pinyin[end_ret[i]][1], 16, 160 + 30 * (i - start_idx));
     }
 
@@ -534,9 +501,9 @@ void draw_result_page() {
 
     result_spr.createSprite(240, 536);
     result_spr.setSwapBytes(true);
-    result_spr.fillSprite(TFT_WHITE);
+    result_spr.fillSprite(CYBER_YELLOW);
     result_spr.loadFont(xie20);
-    result_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+    result_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
 
     if (n >= 2) {
         uint16_t l_color, node, node_pre;
@@ -561,32 +528,32 @@ void draw_result_page() {
 
                 // 深色线改变字体显示颜色
                 result_spr.setTextColor(
-                    dark_lines.find(get_line_idx(path_result[j])) != dark_lines.end() ? TFT_WHITE : TFT_BLACK, l_color);
+                    dark_lines.find(get_line_idx(path_result[j])) != dark_lines.end() ? CYBER_YELLOW : TFT_BLACK, l_color);
                 result_spr.drawCentreString(line_names[get_line_idx(path_result[j])], 85, 42 + y, 12);
             }
 
             // 画前n-1个站点
             result_spr.loadFont(xie20);
-            result_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+            result_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
             result_spr.drawString(stations[path_result[j]], 60, 20 + y);
             result_spr.fillCircle(44, 30 + y, 10, node);
-            result_spr.fillCircle(44, 30 + y, 4, TFT_WHITE);
+            result_spr.fillCircle(44, 30 + y, 4, CYBER_YELLOW);
         }
 
         // 画最后一个站点
         result_spr.loadFont(xie20);
-        result_spr.setTextColor(TFT_BLACK, TFT_WHITE);
+        result_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
         result_spr.drawString(stations[path_result[n - 1]], 60, 20 + (n - 1 + result_start_y) * 40);
         result_spr.fillCircle(44, 30 + (n - 1 + result_start_y) * 40, 10, node);
-        result_spr.fillCircle(44, 30 + (n - 1 + result_start_y) * 40, 4, TFT_WHITE);
+        result_spr.fillCircle(44, 30 + (n - 1 + result_start_y) * 40, 4, CYBER_YELLOW);
     } else {
         // 进入error页
-        result_spr.fillSprite(TFT_BLACK);
-        result_spr.fillSmoothRoundRect(5, 208, 230, 120, 15, TFT_WHITE);
+        result_spr.fillSprite(CYBER_YELLOW);
+        result_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
         result_spr.drawString("没有找到路线！", 10, 218);
         result_spr.drawString("你设置了相同的起点和终", 10, 258);
-        result_spr.drawString("点，双击左键以返回上一", 10, 278);
-        result_spr.drawString("级重新设置站点。", 10, 298);
+        result_spr.drawString("点，双击左键以返回上一", 10, 288);
+        result_spr.drawString("级重新设置站点。", 10, 318);
     }
 
     lcd_PushColors(0, 0, 240, 536, (uint16_t *)result_spr.getPointer());
@@ -596,15 +563,14 @@ void draw_result_page() {
 void draw_user_guide() {
     user_guide_spr.createSprite(240, 536);
     user_guide_spr.setSwapBytes(true);
-    user_guide_spr.fillSprite(TFT_BLACK);
+    user_guide_spr.fillSprite(CYBER_YELLOW);
     user_guide_spr.loadFont(xie24);
-    user_guide_spr.setTextColor(TFT_WHITE, TFT_BLACK);
-    user_guide_spr.drawCentreString("上海地铁查询系统", 120, 10, 24);
-    user_guide_spr.drawWideLine(20, 35, 220, 35, 2, TFT_WHITE);
-    user_guide_spr.loadFont(xie20);
+    user_guide_spr.setTextColor(TFT_BLACK, CYBER_YELLOW);
+
+    user_guide_spr.drawCentreString("欢迎来到夜之城", 120, 10, 24);
+    user_guide_spr.drawWideLine(40, 40, 200, 40, 4, TFT_BLACK);
 
     const char guide[][34] = {
-        "",
         "功能1:",
         "查看线路，双击选择起点",
         "再次双击选择终点。",
@@ -615,18 +581,21 @@ void draw_user_guide() {
         "完成后显示结果。",
         "",
         "按键说明:",
-        "",
         "右键单击: 右翻页/输入",
         "右键双击: 确定/下一级",
         "右键长按: 向右/下滑动",
-        "",
         "左键单击: 左翻页/删除",
         "左键双击: 返回上一级",
         "左键长按: 向上/左滑动",
     };
 
-    for (int i = 0; i < 19; i++) {
-        user_guide_spr.drawString(guide[i], 10, 40 + 25 * i);
+    for (int i = 0; i < 16; i++) {
+        if ((i == 0) || (i == 4) || (i == 9)) {
+            user_guide_spr.loadFont(xie24);
+        } else {
+            user_guide_spr.loadFont(xie20);
+        }
+        user_guide_spr.drawString(guide[i], 10, 50 + 30 * i);
     }
     lcd_PushColors(0, 0, 240, 536, (uint16_t *)user_guide_spr.getPointer());
 }
@@ -726,6 +695,7 @@ void right_doubleclick() {
             for (int i = 0; i < SH_STATIONS; i++) {
                 if (strcmp(stations[i], station_pinyin[start_ret[cur_start_select]][1]) == 0) {
                     start_station = i;
+                    break;
                 }
             }
             cur_ui = SEARCH_END;
@@ -738,6 +708,7 @@ void right_doubleclick() {
             for (int i = 0; i < SH_STATIONS; i++) {
                 if (strcmp(stations[i], station_pinyin[end_ret[cur_end_select]][1]) == 0) {
                     end_station = i;
+                    break;
                 }
             }
 
@@ -786,7 +757,7 @@ void left_click() {
     if (cur_ui == WELCOME) {
         welcome_cur_select -= 1;
         if (welcome_cur_select < 0) {
-            welcome_cur_select = 0;
+            welcome_cur_select += 3;
         }
     } else if (cur_ui == SHOW_METRO_LINES) {
         cur_station_idx = 0;

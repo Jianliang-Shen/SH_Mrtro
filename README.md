@@ -1,11 +1,10 @@
 上海地铁线路查询
 -----
 
-开发板：乐鑫ESP32-S3 Lilygo AMOLED
-框架：Arduino
-数据来源：https://service.shmetro.com/czxx/index.htm
-算法：Dijkstra
-作者：Jianliang Shen
+- 开发板：乐鑫ESP32-S3 Lilygo AMOLED
+- 框架：Arduino
+- 数据来源：https://service.shmetro.com/czxx/index.htm
+- 算法：Dijkstra
 
 ## 下载方法
 VScode+PlatformIO
@@ -23,8 +22,4 @@ VScode+PlatformIO
   * 左键长按：向上/左滑动,
 
 ## 效果图
-![](/pics/ui.jpg)
-![](/pics/lines.jpg)
-![](/pics/start.jpg)
-![](/pics/end.jpg)
-![](/pics/result.jpg)
+![](/pics/back_2.png)
